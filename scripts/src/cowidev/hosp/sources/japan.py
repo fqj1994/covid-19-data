@@ -15,25 +15,41 @@ SEARCH_RE = re.compile(r"新型コロナウイルス感染症患者の療養状�
 
 
 def process_file(url: str, date: str) -> dict:
-    # print(url)
     df = pd.read_excel(url)
 
     for col in df:
-        for obj in df[col][0:5]:
-            if type(obj) is str and "入院者数" in obj:
+        for obj in df[col][0:10]:
+            if type(obj) is not str:
+                continue
+            obj = obj.replace('\n', '')
+            if "入院者数" in obj:
                 hospitalized_col = df[col]
+            if "うち重症者数" in obj:
+                critical_col = df[col]
 
-    if hospitalized_col is None:
-        return None
+    ret = []
 
-    hospitalized_col = hospitalized_col.dropna()
-    hospitalized = hospitalized_col.iloc[-1]
-    return {
-        "date": date,
-        "indicator": "Daily hospital occupancy",
-        "value": hospitalized,
-        "entity": METADATA["entity"],
-    }
+    if hospitalized_col is not None:
+        hospitalized_col = hospitalized_col.dropna()
+        hospitalized = hospitalized_col.iloc[-1]
+        ret.append({
+            "date": date,
+            "indicator": "Daily hospital occupancy",
+            "value": hospitalized,
+            "entity": METADATA["entity"],
+        })
+    
+    if critical_col is not None:
+        critical_col = critical_col.dropna()
+        critical = critical_col.iloc[-1]
+        ret.append({
+            "date": date,
+            "indicator": "Daily ICU occupancy",
+            "value": critical,
+            "entity": METADATA["entity"],
+        })
+
+    return ret
 
 
 def main():
@@ -45,7 +61,7 @@ def main():
         if not path.endswith(".xlsx"):
             continue
         date = str(datetime.date(year=int(year), month=int(month), day=int(day)))
-        records.append(process_file("https://www.mhlw.go.jp" + path, date))
+        records.extend(process_file("https://www.mhlw.go.jp" + path, date))
 
     df = pd.DataFrame.from_records(records)
     return df, METADATA
